@@ -157,7 +157,7 @@ pub fn inspect(request: &InspectRequest) -> Result<InspectOutcome> {
                         line.push_str(&format!(" {lines}L"));
                     }
                     if link {
-                        line.push_str(" -> link");
+                        line.push_str(" symlink");
                     }
                     if let Some(modified) = &modified {
                         line.push(' ');
@@ -326,7 +326,11 @@ mod tests {
         )
         .unwrap();
         let outcome = fixture.run(&["link.txt"]);
-        assert!(outcome.text.contains("-> link"), "{}", outcome.text);
+        assert!(
+            outcome.text.contains("link.txt 2B 1L symlink"),
+            "{}",
+            outcome.text
+        );
         assert!(outcome.paths[0].symlink);
     }
 
