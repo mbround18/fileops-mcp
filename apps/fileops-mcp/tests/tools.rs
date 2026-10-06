@@ -20,7 +20,14 @@ fn every_tool_is_advertised_with_its_batch_parameters() {
     assert_eq!(
         sorted,
         vec![
-            "extract", "find", "grep", "inspect", "outline", "read", "survey"
+            "extract",
+            "find",
+            "grep",
+            "inspect",
+            "outline",
+            "read",
+            "survey",
+            "workspace_inventory"
         ]
     );
 
@@ -46,11 +53,34 @@ fn every_tool_is_advertised_with_its_batch_parameters() {
             "`{parameter}` missing from {schema}"
         );
     }
+
     assert!(
         server.instructions.contains("Prefer these tools over"),
         "the server tells the client what it is for: {}",
         server.instructions
     );
+}
+
+#[test]
+fn workspace_inventory_reports_siblings_and_local_links() {
+    let tree = Tree::new();
+    std::fs::create_dir(tree.path().join("ThunderForgeVTT-levels")).unwrap();
+    std::fs::create_dir(tree.path().join("ThunderForgeVTT-ruler")).unwrap();
+    std::fs::create_dir(tree.path().join("other")).unwrap();
+    std::os::unix::fs::symlink("../target-repo", tree.path().join("gitops")).unwrap();
+
+    let mut server = tree.server();
+    let result = server.call(
+        "workspace_inventory",
+        serde_json::json!({"base_dir": ".", "inspect_links": ["gitops", "fileops"]}),
+    );
+    assert!(!result.is_error(), "{}", result.text());
+    let text = result.text();
+    assert!(text.contains("siblings:"), "{text}");
+    assert!(text.contains("ThunderForgeVTT-levels"), "{text}");
+    assert!(text.contains("ThunderForgeVTT-ruler"), "{text}");
+    assert!(text.contains("gitops: symlink"), "{text}");
+    assert!(text.contains("fileops: missing"), "{text}");
 }
 
 #[test]
@@ -325,6 +355,7 @@ fn every_response_carries_its_text_in_both_halves() {
             serde_json::json!({"specs": [{"path": "Cargo.toml"}]}),
         ),
         ("survey", serde_json::json!({})),
+        ("workspace_inventory", serde_json::json!({})),
     ] {
         let result = server.call(tool, arguments);
         assert!(!result.is_error(), "{tool}: {}", result.text());

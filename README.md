@@ -64,6 +64,7 @@ a footer that tallies what it cost.
 | `outline` | The shape of a file without its contents — one line per heading, `fn`, `class`, `interface`, Make target or config section, with its line number. The call that replaces reading the first hundred lines. |
 | `extract` | Named values out of JSON, YAML and TOML — `jq '.a.b[0]'` over a batch, without the document. `query` is a dotted path with `[]` fan-out; `keys` lists a level's shape; `depth` summarises instead of expanding. |
 | `survey` | What a tree is made of: files, lines and bytes per file type, then the largest files, then the totals. A dozen lines however large the repository. |
+| `workspace_inventory` | Read-only sibling workspace and local link inventory in one call: lists `<prefix>-*` directories and reports status/targets for named local symlinks. |
 
 The rules behind them:
 

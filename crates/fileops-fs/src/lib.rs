@@ -35,6 +35,7 @@ pub mod slice;
 pub mod survey;
 pub mod text;
 pub mod walk;
+pub mod workspace;
 
 pub use budget::{Budget, DEFAULT_MAX_BYTES};
 pub use extract::{ExtractOutcome, ExtractRequest, ExtractSpec, extract};
@@ -44,6 +45,7 @@ pub use inspect::{InspectOutcome, InspectRequest, inspect};
 pub use outline::{FileOutline, OutlineOutcome, OutlineRequest, outline};
 pub use read::{FileRead, ReadOutcome, ReadRequest, ReadSpec, read};
 pub use survey::{SurveyOutcome, SurveyRequest, survey};
+pub use workspace::{WorkspaceInventoryOutcome, WorkspaceInventoryRequest, workspace_inventory};
 
 /// Errors that make a whole request invalid.
 ///

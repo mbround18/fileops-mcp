@@ -8,7 +8,7 @@ use std::path::PathBuf;
 
 use fileops_fs::{
     ExtractRequest, ExtractSpec, FindRequest, GrepRequest, InspectRequest, OutlineRequest,
-    ReadRequest, ReadSpec, SurveyRequest,
+    ReadRequest, ReadSpec, SurveyRequest, WorkspaceInventoryRequest,
 };
 use rmcp::{
     ErrorData, ServerHandler,
@@ -38,6 +38,8 @@ instead of the first hundred lines.
 document. `keys` lists a level's shape instead of its contents.
 - `survey` — what a tree is made of: files, lines and bytes per file type, and the largest \
 files. A dozen lines however large the repository.
+- `workspace_inventory` — read-only sibling workspace and local symlink inventory for \
+multi-checkout setups.
 
 Two habits make the difference:
 
@@ -344,6 +346,22 @@ pub struct SurveyParams {
     pub max_bytes: Option<usize>,
 }
 
+#[derive(Debug, Default, Deserialize, schemars::JsonSchema)]
+pub struct WorkspaceInventoryParams {
+    /// Prefix used to match sibling directories (`<prefix>-*`). Defaults to `ThunderForgeVTT`.
+    #[serde(default)]
+    pub prefix: Option<String>,
+    /// Directory containing sibling workspaces. Defaults to parent of `cwd`.
+    #[serde(default)]
+    pub base_dir: Option<String>,
+    /// Names to inspect as local links/symlinks under `cwd`.
+    #[serde(default)]
+    pub inspect_links: Vec<String>,
+    /// Directory relative paths resolve against. Defaults to the server's own.
+    #[serde(default)]
+    pub cwd: Option<String>,
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct FileOpsServer {
     /// Server-wide default budget, from `--max-bytes`. A request may still name its own.
@@ -574,6 +592,26 @@ impl FileOpsServer {
         };
 
         match fileops_fs::survey(&request) {
+            Ok(outcome) => Ok(with_structured(outcome.text.clone(), &outcome)),
+            Err(err) => Ok(failed(err)),
+        }
+    }
+
+    #[tool(
+        name = "workspace_inventory",
+        description = "Read-only inventory for sibling workspace checkouts (`<prefix>-*`) and local links/symlinks in one call. Useful for validating shared-workspace wiring without shell loops."
+    )]
+    fn workspace_inventory(
+        &self,
+        Parameters(params): Parameters<WorkspaceInventoryParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let request = WorkspaceInventoryRequest {
+            prefix: params.prefix,
+            base_dir: params.base_dir.map(PathBuf::from),
+            inspect_links: params.inspect_links,
+            cwd: params.cwd.map(PathBuf::from),
+        };
+        match fileops_fs::workspace_inventory(&request) {
             Ok(outcome) => Ok(with_structured(outcome.text.clone(), &outcome)),
             Err(err) => Ok(failed(err)),
         }
