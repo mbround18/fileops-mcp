@@ -3,10 +3,7 @@
 //! This replaces ad-hoc shell probes like `ls ../Prefix-*` and repeated `readlink/stat`
 //! loops with one bounded call that returns structured data plus concise text.
 
-use std::{
-    fs,
-    path::{Path, PathBuf},
-};
+use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
@@ -77,30 +74,39 @@ pub fn workspace_inventory(
         return Err(Error::InvalidRequest("prefix cannot be empty".into()));
     }
 
-    let base_dir = match &request.base_dir {
-        Some(dir) if dir.is_absolute() => dir.clone(),
-        Some(dir) => cwd_abs.join(dir),
-        None => cwd_abs
-            .parent()
-            .ok_or_else(|| {
-                Error::InvalidRequest("cannot infer base directory from filesystem root".into())
-            })?
-            .to_path_buf(),
-    };
+    let inventory = workspaceops::inventory(
+        &cwd_abs,
+        &prefix,
+        request.base_dir.as_deref(),
+        &request.inspect_links,
+    )
+    .map_err(|e| Error::InvalidRequest(format!("workspace inventory failed: {e}")))?;
 
-    let mut siblings = collect_siblings(&base_dir, &prefix)?;
-    siblings.sort_by(|a, b| a.name.cmp(&b.name));
-
-    let mut links = Vec::new();
-    for name in &request.inspect_links {
-        links.push(inspect_link(&cwd_abs, name));
-    }
+    let siblings: Vec<SiblingEntry> = inventory
+        .siblings
+        .into_iter()
+        .map(|s| SiblingEntry {
+            name: s.name,
+            path: s.path,
+            has_git_dir: s.has_git_dir,
+        })
+        .collect();
+    let links: Vec<LinkEntry> = inventory
+        .links
+        .into_iter()
+        .map(|l| LinkEntry {
+            name: l.name,
+            path: l.path,
+            kind: l.kind,
+            target: l.target,
+            resolved: l.resolved,
+        })
+        .collect();
 
     let mut text = String::new();
     text.push_str(&format!(
         "base: {}\nprefix: {}\n\n",
-        base_dir.display(),
-        prefix
+        inventory.base_dir, prefix
     ));
     if siblings.is_empty() {
         text.push_str("siblings: none\n");
@@ -130,84 +136,10 @@ pub fn workspace_inventory(
     }
 
     Ok(WorkspaceInventoryOutcome {
-        base_dir: base_dir.display().to_string(),
+        base_dir: inventory.base_dir,
         prefix,
         siblings,
         links,
         text,
     })
-}
-
-fn collect_siblings(base_dir: &Path, prefix: &str) -> Result<Vec<SiblingEntry>> {
-    let mut out = Vec::new();
-    let entries = fs::read_dir(base_dir).map_err(|e| {
-        Error::InvalidRequest(format!(
-            "could not read base directory `{}`: {e}",
-            base_dir.display()
-        ))
-    })?;
-
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if !path.is_dir() {
-            continue;
-        }
-        let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
-            continue;
-        };
-        if !name.starts_with(&format!("{prefix}-")) {
-            continue;
-        }
-        out.push(SiblingEntry {
-            name: name.to_owned(),
-            path: path.display().to_string(),
-            has_git_dir: path.join(".git").exists(),
-        });
-    }
-    Ok(out)
-}
-
-fn inspect_link(cwd: &Path, name: &str) -> LinkEntry {
-    let path = cwd.join(name);
-    let display = path.display().to_string();
-    match fs::symlink_metadata(&path) {
-        Err(_) => LinkEntry {
-            name: name.to_owned(),
-            path: display,
-            kind: "missing".into(),
-            target: None,
-            resolved: None,
-        },
-        Ok(meta) if meta.file_type().is_symlink() => {
-            let target = fs::read_link(&path).ok().map(|t| t.display().to_string());
-            let resolved = fs::canonicalize(&path)
-                .ok()
-                .map(|p| p.display().to_string());
-            LinkEntry {
-                name: name.to_owned(),
-                path: display,
-                kind: "symlink".into(),
-                target,
-                resolved,
-            }
-        }
-        Ok(meta) if meta.is_dir() => LinkEntry {
-            name: name.to_owned(),
-            path: display,
-            kind: "directory".into(),
-            target: None,
-            resolved: fs::canonicalize(&path)
-                .ok()
-                .map(|p| p.display().to_string()),
-        },
-        Ok(_) => LinkEntry {
-            name: name.to_owned(),
-            path: display,
-            kind: "file".into(),
-            target: None,
-            resolved: fs::canonicalize(&path)
-                .ok()
-                .map(|p| p.display().to_string()),
-        },
-    }
 }
