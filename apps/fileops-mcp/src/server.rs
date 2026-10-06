@@ -20,7 +20,8 @@ Reading the filesystem without spending a context window on it. Prefer these too
 shell `cat`, `head`, `tail`, `sed -n`, `grep`, `ls`, `find`, `tree` and `wc -l`.
 
 - `read` — line slices of many files in one call. Each spec takes `lines` (`12-40,98-120`), \
-`head`/`tail`, a `grep` filter with `context`, and `max_lines`; `path` may be a glob.
+`head`/`tail`, `from`/`to` regexes for a named section, a `grep` filter with `context`, and \
+`max_lines`; `path` may be a glob.
 - `grep` — search several patterns at once, grouped by file, with `mode: counts` or \
 `mode: files` when the matches themselves are not the question.
 - `find` — listings grouped by directory. `depth: 1` is `ls`; `glob`, `kind` and `stat` \
@@ -75,6 +76,15 @@ pub struct SpecParams {
     /// Last N lines.
     #[serde(default)]
     pub tail: Option<usize>,
+    /// Start at the first line matching this regex and run to `to`, or to the end of the
+    /// file — `sed -n '/pattern/,$p'`. Ignored when `lines` is given.
+    #[serde(default)]
+    pub from: Option<String>,
+    /// End the selection at the next line matching this regex, inclusive. `{from: "^## \
+    /// Invariants", to: "^## "}` is how you read one section of a document without
+    /// knowing its line numbers; alone, it reads from the top down to the first match.
+    #[serde(default)]
+    pub to: Option<String>,
     /// Keep only lines matching this regex, within whatever `lines`/`head`/`tail` selected.
     /// Prefix with `(?i)` for case-insensitive.
     #[serde(default)]
@@ -249,6 +259,8 @@ impl FileOpsServer {
                     lines: spec.lines,
                     head: spec.head,
                     tail: spec.tail,
+                    from: spec.from,
+                    to: spec.to,
                     grep: spec.grep,
                     context: spec.context,
                     max_lines: spec.max_lines,

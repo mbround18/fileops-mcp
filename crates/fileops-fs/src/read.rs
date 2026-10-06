@@ -19,9 +19,11 @@ use crate::{
 
 /// One file to read, and how much of it.
 ///
-/// `lines` wins over `head`/`tail`. `grep` then filters whatever the window selected, so
-/// `{head: 200, grep: "TODO"}` means "TODOs in the first 200 lines" rather than a whole-file
-/// search. Patterns are Rust regexes; `(?i)` at the front makes one case-insensitive.
+/// The window is chosen by the first of these that is given: `lines`, then `from`/`to`,
+/// then `head`/`tail`, then the whole file. `grep` filters whatever the window selected,
+/// so `{head: 200, grep: "TODO"}` means "TODOs in the first 200 lines" rather than a
+/// whole-file search. Patterns are Rust regexes; `(?i)` at the front makes one
+/// case-insensitive.
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ReadSpec {
@@ -36,6 +38,15 @@ pub struct ReadSpec {
     /// Last N lines.
     #[serde(default)]
     pub tail: Option<usize>,
+    /// Start the selection at the first line matching this regex — `sed '/pattern/,$p'`.
+    /// Ignored when `lines` is given.
+    #[serde(default)]
+    pub from: Option<String>,
+    /// End the selection at the next line matching this regex, inclusive. With `from`,
+    /// the pair repeats like `sed -n '/a/,/b/p'`, so a heading pattern yields a section
+    /// per match. Alone, it reads from the top of the file down to the first match.
+    #[serde(default)]
+    pub to: Option<String>,
     /// Keep only lines matching this regex, within whatever the window selected.
     #[serde(default)]
     pub grep: Option<String>,
@@ -128,14 +139,10 @@ pub fn read(request: &ReadRequest) -> Result<ReadOutcome> {
     let mut skipped = 0;
 
     for spec in &request.specs {
-        // A bad regex is the request's problem, not the file's, so it fails the call.
-        let matcher = match &spec.grep {
-            Some(pattern) => Some(regex::Regex::new(pattern).map_err(|err| Error::BadPattern {
-                pattern: pattern.clone(),
-                detail: first_line(&err.to_string()),
-            })?),
-            None => None,
-        };
+        let matcher = compile(spec.grep.as_deref())?;
+
+        let from = compile(spec.from.as_deref())?;
+        let to = compile(spec.to.as_deref())?;
 
         let paths = walk::expand(cwd, &spec.path)?;
         if paths.is_empty() {
@@ -197,7 +204,11 @@ pub fn read(request: &ReadRequest) -> Result<ReadOutcome> {
 
             let all = text::lines(&content);
             let total = all.len();
-            let window = slice::window(spec.lines.as_deref(), spec.head, spec.tail, total)?;
+            let window = if spec.lines.is_none() && (from.is_some() || to.is_some()) {
+                slice::ranges(&all, from.as_ref(), to.as_ref())
+            } else {
+                slice::window(spec.lines.as_deref(), spec.head, spec.tail, total)?
+            };
             let selected = match &matcher {
                 None => window.clone(),
                 Some(re) => {
@@ -325,6 +336,18 @@ fn footer(files: usize, lines: usize, bytes: usize, truncated: usize, skipped: u
     footer
 }
 
+/// A bad regex is the request's problem, not the file's, so it fails the whole call.
+fn compile(pattern: Option<&str>) -> Result<Option<regex::Regex>> {
+    pattern
+        .map(|pattern| {
+            regex::Regex::new(pattern).map_err(|err| Error::BadPattern {
+                pattern: pattern.to_owned(),
+                detail: first_line(&err.to_string()),
+            })
+        })
+        .transpose()
+}
+
 pub(crate) fn plural(n: usize) -> &'static str {
     if n == 1 { "" } else { "s" }
 }
@@ -392,6 +415,62 @@ mod tests {
             path: path.to_owned(),
             ..Default::default()
         }
+    }
+
+    #[test]
+    fn a_section_can_be_named_by_its_heading_instead_of_its_line_numbers() {
+        let fixture = Fixture::new();
+        fixture.write(
+            "doc.md",
+            "# Title\nintro\n## Invariants\nfirst\nsecond\n## Testing\nmake check\n",
+        );
+
+        let outcome = fixture.read(vec![ReadSpec {
+            path: "doc.md".into(),
+            from: Some("^## Invariants".into()),
+            to: Some("^## ".into()),
+            ..Default::default()
+        }]);
+
+        let (body, _) = split(&outcome.text);
+        assert_eq!(
+            body,
+            "#1 doc.md 3-6/7\n3: ## Invariants\n4: first\n5: second\n6: ## Testing\n"
+        );
+    }
+
+    #[test]
+    fn an_explicit_line_selection_wins_over_a_pattern_range() {
+        let fixture = Fixture::new();
+        fixture.numbered("a.txt", 10);
+
+        let outcome = fixture.read(vec![ReadSpec {
+            path: "a.txt".into(),
+            lines: Some("2-3".into()),
+            from: Some("^line 7$".into()),
+            ..Default::default()
+        }]);
+
+        assert!(
+            outcome.text.contains("#1 a.txt 2-3/10\n"),
+            "{}",
+            outcome.text
+        );
+    }
+
+    #[test]
+    fn a_range_that_never_opens_reports_the_file_as_read_and_empty() {
+        let fixture = Fixture::new();
+        fixture.numbered("a.txt", 5);
+
+        let outcome = fixture.read(vec![ReadSpec {
+            path: "a.txt".into(),
+            from: Some("^nothing here$".into()),
+            ..Default::default()
+        }]);
+
+        assert_eq!(outcome.lines_shown, 0);
+        assert_eq!(outcome.files[0].total_lines, Some(5));
     }
 
     #[test]

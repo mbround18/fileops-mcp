@@ -44,6 +44,9 @@ The header is `#<spec index> <path> <spans>/<total lines>`:
   was asked for even when a path appears twice.
 * `1-2` is the slice being shown, `12-40,98-120` when it is several, `/100` the file's
   real length. A header with no spans is a status line for a path that was not read.
+* A spec selected by `from`/`to` renders like any other slice — the header names the line
+  numbers the section turned out to occupy (`3-6/7`), so it can be read again or edited
+  against without re-deriving them.
 * Body lines are `<line number>: <text>`. With `number: false` the numbers are dropped and
   a `...` line marks each gap between spans instead.
 

@@ -39,6 +39,13 @@ A whole file is almost never the question. The cheapest spec is the most specifi
 | From a line to the end | `{"lines": "900-"}` |
 | Only what matches | `{"grep": "fn ", "context": 2}` |
 | A bounded sample of matches | `{"grep": "TODO", "max_lines": 15}` |
+| One section of a document | `{"from": "^## Invariants", "to": "^## "}` |
+| From a marker to the end | `{"from": "^## Appendix"}` |
+
+`from`/`to` are `sed`'s address ranges (`sed -n '/a/,/b/p'`), and they are how you read a
+section you can name but cannot number: `{"path": "CONTRIBUTING.md", "from": "^## Invariants", "to": "^## "}` returns that section and nothing else, and keeps working after
+the file grows. Given both, the pair repeats, so `{"from": "^## ", "to": "^## "}` is every
+section rather than the first.
 
 `grep` inside a `read` spec is the one worth remembering: it turns "find the handlers in
 this 2 000-line file" into fifteen lines with their numbers, which is enough to choose the

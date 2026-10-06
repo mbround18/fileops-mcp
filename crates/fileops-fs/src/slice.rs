@@ -121,6 +121,45 @@ pub fn window(
     Ok(normalize(spans, total))
 }
 
+/// `sed`-style address ranges: every `from` match opens a span, the next `to` match
+/// closes it, and an unclosed span runs to the end of the file.
+///
+/// `from` alone is "from here to the end", `to` alone is "the top of the file down to
+/// here", and both repeat the way `sed -n '/a/,/b/p'` repeats — a heading pattern matching
+/// three times yields three sections, not one.
+pub fn ranges(lines: &[&str], from: Option<&regex::Regex>, to: Option<&regex::Regex>) -> Vec<Span> {
+    let total = lines.len();
+    let mut spans = Vec::new();
+    let mut open: Option<usize> = from.is_none().then_some(1);
+    for (index, line) in lines.iter().enumerate() {
+        let number = index + 1;
+        match open {
+            None => {
+                if from.is_some_and(|re| re.is_match(line)) {
+                    open = Some(number);
+                    // A `to` that also matches the opening line would close it instantly,
+                    // which is never what the caller meant, so the close starts next line.
+                }
+            }
+            Some(start) => {
+                if to.is_some_and(|re| re.is_match(line)) && number > start {
+                    spans.push(Span::new(start, number));
+                    // The line that closed a section can be the one that opens the next —
+                    // with `from` and `to` both `^## `, every section is selected rather
+                    // than every other one.
+                    open = from.is_some_and(|re| re.is_match(line)).then_some(number);
+                }
+            }
+        }
+    }
+    if let Some(start) = open
+        && total > 0
+    {
+        spans.push(Span::new(start, total));
+    }
+    normalize(spans, total)
+}
+
 /// Grow each matching line into a span of `context` lines either side, then merge.
 pub fn with_context(matches: &[usize], context: usize, total: usize) -> Vec<Span> {
     let spans = matches
@@ -211,6 +250,58 @@ mod tests {
             spans(&[(12, 40), (98, 120)])
         );
         assert_eq!(parse("40-").unwrap(), spans(&[(40, usize::MAX)]));
+    }
+
+    fn re(pattern: &str) -> regex::Regex {
+        regex::Regex::new(pattern).unwrap()
+    }
+
+    #[test]
+    fn address_ranges_repeat_like_sed() {
+        let lines = ["## a", "one", "## b", "two", "three", "## c", "four"];
+        assert_eq!(
+            ranges(&lines, Some(&re("^## ")), Some(&re("^## "))),
+            spans(&[(1, 7)]),
+            "adjacent sections merge into one run rather than repeating a line"
+        );
+        let lines = ["## a", "one", "", "filler", "## b", "two"];
+        assert_eq!(
+            ranges(&lines, Some(&re("^## a")), Some(&re("^$"))),
+            spans(&[(1, 3)])
+        );
+    }
+
+    #[test]
+    fn an_unclosed_range_runs_to_the_end_of_the_file() {
+        let lines = ["one", "## here", "two", "three"];
+        assert_eq!(ranges(&lines, Some(&re("^## ")), None), spans(&[(2, 4)]));
+        assert_eq!(
+            ranges(&lines, Some(&re("^## ")), Some(&re("^never$"))),
+            spans(&[(2, 4)])
+        );
+    }
+
+    #[test]
+    fn a_close_pattern_alone_reads_from_the_top() {
+        let lines = ["one", "stop", "two"];
+        assert_eq!(ranges(&lines, None, Some(&re("^stop$"))), spans(&[(1, 2)]));
+    }
+
+    #[test]
+    fn a_range_that_never_opens_selects_nothing() {
+        let lines = ["one", "two"];
+        assert!(ranges(&lines, Some(&re("^nope$")), None).is_empty());
+        assert!(ranges(&[], Some(&re("^a$")), None).is_empty());
+    }
+
+    #[test]
+    fn a_close_pattern_does_not_close_the_line_that_opened_the_range() {
+        let lines = ["## a", "one", "## b", "two"];
+        assert_eq!(
+            ranges(&lines, Some(&re("^## a")), Some(&re("^## "))),
+            spans(&[(1, 3)]),
+            "the section runs to the next heading, not zero lines"
+        );
     }
 
     #[test]

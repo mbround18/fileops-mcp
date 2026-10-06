@@ -57,7 +57,7 @@ a footer that tallies what it cost.
 
 | Tool | Behavior |
 | --- | --- |
-| `read` | Line slices of many files in one call — `cat`, `head`, `tail` and `sed -n` batched. Per spec: `lines` (`12-40,98-120`), `head`/`tail`, a `grep` filter with `context`, `max_lines`. Paths may be globs. |
+| `read` | Line slices of many files in one call — `cat`, `head`, `tail` and `sed -n` batched. Per spec: `lines` (`12-40,98-120`), `head`/`tail`, `from`/`to` regexes for a section you can name but not number, a `grep` filter with `context`, `max_lines`. Paths may be globs. |
 | `grep` | Several regexes at once, grouped by file: the path once, matches with line numbers, caps per file and per call. `mode: counts` or `mode: files` when the matches are not the question. |
 | `find` | Listings grouped by directory — `ls`, `find` and `tree`. `depth: 1` is `ls`; `glob`, `kind`, `stat` and `sort` narrow or widen it. |
 | `inspect` | Size, line count, kind, date and symlink status for a batch of paths. The cheap call that stops an expensive one. |
