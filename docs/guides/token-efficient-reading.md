@@ -91,7 +91,47 @@ heading it returns is exactly the `from` pattern a `read` needs.
 `pattern` makes it work on anything with a convention of its own — `^TASK `, `^- \[ \]`,
 `^### T0` — for file types with no built-in pattern.
 
-## 5. Narrow the walk, not the output
+## 5. Ask a config for the value, not the document
+
+A `package.json`, a lockfile, a CI workflow or a `Cargo.toml` is a document you almost
+never want in full. `extract` answers the question:
+
+```json
+{"specs": [
+  {"path": "package.json", "query": "scripts"},
+  {"path": "Cargo.toml", "query": "workspace.dependencies", "depth": 1},
+  {"path": ".github/workflows/ci.yml", "query": "jobs[].steps[].run"}
+]}
+```
+
+`[]` fans out over an array, and the paths that come back carry the real index, so the
+answer doubles as the query for the next call. Against a document you have not seen,
+`keys: true` first — one line per child with its type and size — then a query for the
+branch that matters. `depth: 1` is the middle ground: a line per key with `{3 keys}` or
+`[12]` where a subtree would have been.
+
+## 6. Start with the survey, not the listing
+
+`find` on an unfamiliar repository is the wrong first call: it costs a line per path to
+tell you something a dozen lines could. `survey` aggregates the same walk:
+
+```json
+{"paths": ["."], "exclude": ["**/target/**"]}
+```
+```
+rs 17 files 207K 6.4kL
+md 5 files 28K 659L
+toml 3 files 2.1K 75L
+largest:
+apps/fileops-mcp/src/server.rs 24K 607L
+[28 files in 11 dirs, 271K, 8.5kL]
+```
+
+That is the language, the size, and where the weight sits, in one bounded call — and the
+`largest:` table is usually the list of files worth outlining next. On a very large tree
+`lines: false` skips opening files altogether.
+
+## 7. Narrow the walk, not the output
 
 `grep` and `find` honour `.gitignore` and skip hidden files by default, and never enter
 `.git`. That — not the formatting — is most of why they are cheaper than `grep -r`. Narrow
@@ -105,7 +145,7 @@ further with the walk, before anything is read:
 A path you name outright is always read, whatever the filters say — so a `glob` never
 hides the one file you asked for.
 
-## 6. Let the budget do the worrying
+## 8. Let the budget do the worrying
 
 Every response has a byte ceiling: 40 000 by default, up to 400 000 with `max_bytes`. It
 cannot be switched off, so the worst case of a careless call is a truncation marker rather
@@ -124,19 +164,19 @@ shows 20 matches per file and 200 per call, `find` 500 entries, and each one say
 bit. `mode: counts` and `mode: files` are one line per file, so those two caps do not
 apply to them — the tally is always the whole tally.
 
-## 7. Keep the line numbers
+## 9. Keep the line numbers
 
 `number: true` is the default because a slice without line numbers cannot be edited
 against — you would have to read the file again to find out where you were. Turn it off
 only when the text itself is the deliverable (a file being copied verbatim), and
 `raw: true` only when trailing whitespace matters.
 
-## 8. What a batch should look like
+## 10. What a batch should look like
 
-Orienting in an unfamiliar repository, in three calls:
+Orienting in an unfamiliar repository, in four calls:
 
 ```json
-{"roots": ["."], "depth": 2, "kind": "dir"}
+{"paths": ["."], "exclude": ["**/target/**", "**/node_modules/**"]}
 ```
 ```json
 {"patterns": ["fn main", "#\\[tokio::main\\]"], "paths": ["."], "glob": ["**/*.rs"], "mode": "files"}
@@ -153,5 +193,5 @@ Orienting in an unfamiliar repository, in three calls:
 ]}
 ```
 
-Shape, then location, then outline, then content — and never a whole file where a heading
+Survey, then location, then outline, then content — and never a whole file where a heading
 list would have done.

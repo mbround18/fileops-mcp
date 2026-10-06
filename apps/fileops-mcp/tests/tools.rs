@@ -17,7 +17,12 @@ fn every_tool_is_advertised_with_its_batch_parameters() {
         .collect();
     let mut sorted = names.clone();
     sorted.sort();
-    assert_eq!(sorted, vec!["find", "grep", "inspect", "outline", "read"]);
+    assert_eq!(
+        sorted,
+        vec![
+            "extract", "find", "grep", "inspect", "outline", "read", "survey"
+        ]
+    );
 
     let read = tools["tools"]
         .as_array()
@@ -238,5 +243,58 @@ fn an_outline_locates_what_a_following_read_should_name() {
          8: \n\
          9: ## Usage\n\
          [1 file, 5 lines, 72 chars]\n"
+    );
+}
+
+#[test]
+fn extract_reads_one_value_instead_of_a_whole_config() {
+    let tree = Tree::new();
+    tree.write(
+        "Cargo.toml",
+        "[package]\nname = \"thing\"\nversion = \"0.3.1\"\n\n[dependencies]\nserde = \"1\"\n",
+    )
+    .write(
+        "ci.yml",
+        "jobs:\n  build:\n    steps:\n      - run: make check\n      - run: make install\n",
+    );
+    let mut server = tree.server();
+
+    let values = server.call(
+        "extract",
+        serde_json::json!({"specs": [
+            {"path": "Cargo.toml", "query": "package.version"},
+            {"path": "ci.yml", "query": "jobs.build.steps[].run"}
+        ]}),
+    );
+    assert!(!values.is_error(), "{}", values.text());
+    assert_eq!(
+        values.text(),
+        "#1 Cargo.toml package.version (1)\n\
+         package.version = 0.3.1\n\
+         #2 ci.yml jobs.build.steps[].run (2)\n\
+         jobs.build.steps[0].run = make check\n\
+         jobs.build.steps[1].run = make install\n\
+         [2 documents, 3 values]\n"
+    );
+}
+
+#[test]
+fn a_survey_sizes_up_a_tree_before_anything_is_read() {
+    let tree = Tree::new();
+    tree.write("src/lib.rs", "a\nb\nc\n")
+        .write("src/main.rs", "d\n")
+        .write("README.md", "# Thing\n");
+    let mut server = tree.server();
+
+    let shape = server.call("survey", serde_json::json!({"top": 2}));
+    assert!(!shape.is_error(), "{}", shape.text());
+    assert_eq!(
+        shape.text(),
+        "md 1 file 8B 1L\n\
+         rs 2 files 8B 4L\n\
+         largest:\n\
+         README.md 8B 1L\n\
+         src/lib.rs 6B 3L\n\
+         [3 files in 2 dirs, 16B, 5L]\n"
     );
 }

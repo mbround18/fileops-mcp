@@ -41,9 +41,13 @@ Ports and adapters, with the filesystem as the only dependency:
   `src/deep/`), and the `ignore::WalkBuilder` setup: `require_git(false)` so `.gitignore`
   is honoured outside a repository, `sort_by_file_name` for determinism, and `.git` never
   entered.
-* `read.rs`, `grep.rs`, `find.rs`, `inspect.rs`, `outline.rs` — one module per tool. Each takes a
+* `read.rs`, `grep.rs`, `find.rs`, `inspect.rs`, `outline.rs`, `extract.rs`, `survey.rs` —
+  one module per tool. Each takes a
   request holding a *list*, spends from one `Budget`, and returns both the rendered text
-  and the structured outcome behind it.
+  and the structured outcome behind it. `extract.rs` parses JSON, YAML and TOML into one
+  `serde_json::Value` so a single dotted-path selector works across all three;
+  `survey.rs` aggregates a walk rather than listing it, which is why its output is
+  bounded by the number of file types rather than the number of files.
 
 ### Invariants
 

@@ -13,6 +13,8 @@
 //! * [`find::find`] — listings (`ls`/`find`/`tree`), grouped by directory.
 //! * [`inspect::inspect`] — size, line count and kind, to decide what is worth reading.
 //! * [`outline::outline`] — the declarations in a file, so the next read can be exact.
+//! * [`extract::extract`] — values out of JSON, YAML and TOML, without the document.
+//! * [`survey::survey`] — what a tree is made of, in a dozen lines whatever its size.
 //!
 //! Three rules hold across all of them:
 //!
@@ -23,21 +25,25 @@
 //!    file in a batch of ten must not cost the other nine.
 
 pub mod budget;
+pub mod extract;
 pub mod find;
 pub mod grep;
 pub mod inspect;
 pub mod outline;
 pub mod read;
 pub mod slice;
+pub mod survey;
 pub mod text;
 pub mod walk;
 
 pub use budget::{Budget, DEFAULT_MAX_BYTES};
+pub use extract::{ExtractOutcome, ExtractRequest, ExtractSpec, extract};
 pub use find::{FindOutcome, FindRequest, find};
 pub use grep::{GrepOutcome, GrepRequest, grep};
 pub use inspect::{InspectOutcome, InspectRequest, inspect};
 pub use outline::{FileOutline, OutlineOutcome, OutlineRequest, outline};
 pub use read::{FileRead, ReadOutcome, ReadRequest, ReadSpec, read};
+pub use survey::{SurveyOutcome, SurveyRequest, survey};
 
 /// Errors that make a whole request invalid.
 ///
@@ -56,6 +62,11 @@ pub enum Error {
     BadRange { spec: String },
     #[error("`{glob}` is not a valid glob: {detail}")]
     BadGlob { glob: String, detail: String },
+    #[error(
+        "`{query}` is not a path into a document; use `a.b`, `a[0].b`, `a[].b` for every \
+         element, or `[\"a.b\"]` for a key with a dot in it"
+    )]
+    BadQuery { query: String },
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

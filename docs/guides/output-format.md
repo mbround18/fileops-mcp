@@ -168,6 +168,59 @@ nope.txt (missing)
 * A directory reports how many entries it holds instead of a size.
 * The footer totals the bytes of the files it could stat.
 
+## `extract`
+
+A header per document, then one `path = value` line per value:
+
+```
+#1 Cargo.toml workspace.dependencies (15)
+workspace.dependencies.anyhow = 1
+workspace.dependencies.clap {2 keys}
+workspace.dependencies.globset = 0.4
+workspace.dependencies.serde {2 keys}
+#2 .mcp.json (1)
+mcpServers {1 key}
+[2 documents, 16 values]
+```
+
+* The header is `#N path <query> (shown)`, or `(shown of found)` when `max_leaves` cut the
+  rest. The query is omitted when the whole document was asked for.
+* A leaf renders as `path = value`: strings bare, newlines escaped, elided with `…` past
+  200 columns. A branch that was not expanded — because `depth` stopped there — renders as
+  a summary instead of a value: `{3 keys}`, `[12]`, `str`, `num`, `bool`, `null`.
+* `keys: true` renders the same summaries one level down, which is the cheapest first look
+  at a document: `integrations [2]`, `profile str`.
+* `[]` in a query fans out over an array and the rendered paths carry the real index, so
+  `jobs[].name` comes back as `jobs[0].name`, `jobs[1].name` — the path you would use to
+  ask again.
+* A document that cannot be used costs one line, not the call:
+  `(no parser for this type)`, `(unparsed: …)`, `(missing)`, `(no match for <query>)`.
+
+## `survey`
+
+Two tables and a footer, and nothing that grows with the size of the tree:
+
+```
+rs 17 files 207K 6.4kL
+lock 1 file 31K 1.3kL
+md 5 files 28K 659L
+(none) 2 files 2.7K 78L
+toml 3 files 2.1K 75L
+largest:
+Cargo.lock 31K 1272L
+apps/fileops-mcp/src/server.rs 24K 607L
+crates/fileops-fs/src/extract.rs 24K 763L
+[28 files in 11 dirs, 271K, 8.5kL]
+```
+
+* One line per file type — extension, file count, total size, total lines — heaviest
+  first, ties broken by name. Files with no extension are `(none)`.
+* Past `kinds` (default 12) the tail is summed into one line: `other (9) 14 files 22K 700L`.
+* `largest:` lists the `top` biggest files (default 10, `0` drops the table).
+* The footer totals files, directories, bytes and lines, and names what it could not read:
+  `[28 files in 11 dirs, 271K, 8.5kL, 2 not counted]`. `lines: false` drops every line
+  count, including those.
+
 ## Structured output
 
 Alongside the text, each tool returns the same data as JSON: `read` gives

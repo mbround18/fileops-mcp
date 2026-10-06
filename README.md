@@ -62,6 +62,8 @@ a footer that tallies what it cost.
 | `find` | Listings grouped by directory — `ls`, `find` and `tree`. `depth: 1` is `ls`; `glob`, `kind`, `stat` and `sort` narrow or widen it. |
 | `inspect` | Size, line count, kind, date and symlink status for a batch of paths. The cheap call that stops an expensive one. |
 | `outline` | The shape of a file without its contents — one line per heading, `fn`, `class`, `interface`, Make target or config section, with its line number. The call that replaces reading the first hundred lines. |
+| `extract` | Named values out of JSON, YAML and TOML — `jq '.a.b[0]'` over a batch, without the document. `query` is a dotted path with `[]` fan-out; `keys` lists a level's shape; `depth` summarises instead of expanding. |
+| `survey` | What a tree is made of: files, lines and bytes per file type, then the largest files, then the totals. A dozen lines however large the repository. |
 
 The rules behind them:
 

@@ -6,7 +6,10 @@
 
 use std::path::PathBuf;
 
-use fileops_fs::{FindRequest, GrepRequest, InspectRequest, OutlineRequest, ReadRequest, ReadSpec};
+use fileops_fs::{
+    ExtractRequest, ExtractSpec, FindRequest, GrepRequest, InspectRequest, OutlineRequest,
+    ReadRequest, ReadSpec, SurveyRequest,
+};
 use rmcp::{
     ErrorData, ServerHandler,
     handler::server::wrapper::Parameters,
@@ -31,6 +34,10 @@ which expensive read is worth making.
 - `outline` — the declarations in a file (headings, `fn`/`class`/`type`, Make targets, \
 config sections) with their line numbers, so the next `read` can name the exact span \
 instead of the first hundred lines.
+- `extract` — one value out of a JSON, YAML or TOML file: `jq '.a.b[0]'` without the \
+document. `keys` lists a level's shape instead of its contents.
+- `survey` — what a tree is made of: files, lines and bytes per file type, and the largest \
+files. A dozen lines however large the repository.
 
 Two habits make the difference:
 
@@ -268,6 +275,75 @@ pub struct InspectParams {
     pub max_bytes: Option<usize>,
 }
 
+#[derive(Debug, Default, Deserialize, schemars::JsonSchema)]
+pub struct ExtractParams {
+    /// The batch of documents to pull values out of.
+    pub specs: Vec<ExtractSpecParams>,
+    #[serde(default)]
+    pub cwd: Option<String>,
+    #[serde(default)]
+    pub max_bytes: Option<usize>,
+}
+
+#[derive(Debug, Default, Deserialize, schemars::JsonSchema)]
+pub struct ExtractSpecParams {
+    /// A `.json`, `.yml`/`.yaml` or `.toml` file.
+    pub path: String,
+    /// Dotted path into the document: `package.version`, `jobs.build.steps[0].run`,
+    /// `jobs[].name` for every element of an array, `["key.with.dots"]` for an awkward
+    /// key. Omit it for the whole document.
+    #[serde(default)]
+    pub query: Option<String>,
+    /// List what is at that path rather than its values — each key with its type and
+    /// size. The cheap first call against a document you have not seen.
+    #[serde(default)]
+    pub keys: bool,
+    /// Levels below the query to render. `1` summarises each child instead of expanding
+    /// it, so a large object costs a line per key.
+    #[serde(default)]
+    pub depth: Option<usize>,
+    /// Values rendered from this document (default 200).
+    #[serde(default)]
+    pub max_leaves: Option<usize>,
+}
+
+#[derive(Debug, Default, Deserialize, schemars::JsonSchema)]
+pub struct SurveyParams {
+    /// Directories, files or globs to survey. Defaults to `.`.
+    #[serde(default)]
+    pub paths: Vec<String>,
+    /// Only count paths matching these globs.
+    #[serde(default)]
+    pub glob: Vec<String>,
+    /// Skip paths matching these globs.
+    #[serde(default)]
+    pub exclude: Vec<String>,
+    /// Directory levels to walk. `1` is the named directory itself.
+    #[serde(default)]
+    pub depth: Option<usize>,
+    /// Include hidden files. `.git` is never walked either way.
+    #[serde(default)]
+    pub hidden: bool,
+    /// Ignore `.gitignore` and friends.
+    #[serde(default)]
+    pub no_ignore: bool,
+    /// File types listed separately before the tail folds into one `other` line
+    /// (default 12).
+    #[serde(default)]
+    pub kinds: Option<usize>,
+    /// Largest files listed (default 10, `0` drops the table).
+    #[serde(default)]
+    pub top: Option<usize>,
+    /// Count lines, which opens every file. Defaults to true; turn it off on a very large
+    /// tree where sizes are enough.
+    #[serde(default)]
+    pub lines: Option<bool>,
+    #[serde(default)]
+    pub cwd: Option<String>,
+    #[serde(default)]
+    pub max_bytes: Option<usize>,
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct FileOpsServer {
     /// Server-wide default budget, from `--max-bytes`. A request may still name its own.
@@ -440,6 +516,64 @@ impl FileOpsServer {
         };
 
         match fileops_fs::inspect(&request) {
+            Ok(outcome) => Ok(with_structured(outcome.text.clone(), &outcome)),
+            Err(err) => Ok(failed(err)),
+        }
+    }
+
+    #[tool(
+        name = "extract",
+        description = "Pull named values out of a JSON, YAML or TOML file without reading the document — `jq`/`yq` over a batch of files. `query` is a dotted path (`package.version`, `jobs.build.steps[0].run`, `jobs[].name` to fan out over an array); each result renders as one `path = value` line. `keys: true` lists what is at a level with each child's type and size, which is the call to make first against a config you have not seen, and `depth` summarises below the query instead of expanding it. A file with no parser, a parse error or a query that matches nothing is reported on its own line and does not fail the call."
+    )]
+    fn extract(
+        &self,
+        Parameters(params): Parameters<ExtractParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let request = ExtractRequest {
+            specs: params
+                .specs
+                .into_iter()
+                .map(|spec| ExtractSpec {
+                    path: spec.path,
+                    query: spec.query,
+                    keys: spec.keys,
+                    depth: spec.depth,
+                    max_leaves: spec.max_leaves,
+                })
+                .collect(),
+            cwd: params.cwd.map(PathBuf::from),
+            max_bytes: self.budget(params.max_bytes),
+        };
+
+        match fileops_fs::extract(&request) {
+            Ok(outcome) => Ok(with_structured(outcome.text.clone(), &outcome)),
+            Err(err) => Ok(failed(err)),
+        }
+    }
+
+    #[tool(
+        name = "survey",
+        description = "What a tree is made of, in one bounded call: a line per file type with its file count, total size and total lines, then the largest files, then the totals. This is the orientation call for an unfamiliar repository — it answers \"what language is this, how big is it, where is the weight\" without a listing. `glob`/`exclude`/`depth` narrow it, `lines: false` skips opening files on a very large tree, `top: 0` drops the largest-files table."
+    )]
+    fn survey(
+        &self,
+        Parameters(params): Parameters<SurveyParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let request = SurveyRequest {
+            paths: params.paths,
+            glob: params.glob,
+            exclude: params.exclude,
+            depth: params.depth,
+            hidden: params.hidden,
+            no_ignore: params.no_ignore,
+            kinds: params.kinds,
+            top: params.top,
+            lines: params.lines.unwrap_or(true),
+            cwd: params.cwd.map(PathBuf::from),
+            max_bytes: self.budget(params.max_bytes),
+        };
+
+        match fileops_fs::survey(&request) {
             Ok(outcome) => Ok(with_structured(outcome.text.clone(), &outcome)),
             Err(err) => Ok(failed(err)),
         }

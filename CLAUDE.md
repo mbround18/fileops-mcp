@@ -14,6 +14,8 @@ This repo registers itself as a project-scope MCP server (`.mcp.json`), so after
 * `mcp__fileops__find` — listings, instead of `ls`/`find`/`tree`.
 * `mcp__fileops__inspect` — sizes and line counts, instead of `ls -l`/`wc -l`/`file`.
 * `mcp__fileops__outline` — a file's declarations, instead of reading its first 100 lines.
+* `mcp__fileops__extract` — one value out of a JSON/YAML/TOML file, instead of `jq`/`yq`.
+* `mcp__fileops__survey` — what the tree is made of, instead of `find | wc -l` pipelines.
 
 Batch them. One `read` with eight specs is the behaviour this repo is arguing for; eight
 calls, or one `Bash` command joining eight `cat`s with `echo` separators, is the behaviour
