@@ -87,9 +87,9 @@ pub struct Largest {
 pub struct SurveyOutcome {
     /// The rendered text. This is what a caller should show; the rest is for machines.
     ///
-    /// Not serialized: the adapter sends it as the response's text, and a structured
-    /// copy of the same bytes would double the cost of every call.
-    #[serde(skip_serializing)]
+    /// Serialized deliberately. Clients differ over which half of a response they
+    /// show, and one that reads only `structuredContent` renders nothing without
+    /// this field, so the duplication is the price of being legible everywhere.
     pub text: String,
     /// File types, heaviest first, after the `kinds` cap has folded the tail into `other`.
     pub kinds: Vec<Kind>,

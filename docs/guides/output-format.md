@@ -231,7 +231,7 @@ modified}` with `found` and `truncated`; `inspect` gives `paths[] {path, status,
 bytes, lines, entries, modified, symlink}` with `total_bytes` and `missing`. Read the text
 — the JSON is there for callers that need to branch on a count.
 
-The rendered text is not part of that JSON. It is sent once, as the response's text block;
-repeating it in the structured copy would double the cost of every call, which for a
-40-line `read` is the difference between 2.1k and 4.1k bytes on the wire. So branch on
-`truncated`, `lines_shown` or `missing`, and show the text itself.
+The JSON carries the rendered text too, under `text`, identical to the response's text
+content. Hosts disagree about which half they show — some display the structured content
+and ignore the text block — so both are filled in and either one is enough. Show `text`,
+and branch on `truncated`, `lines_shown` or `missing`.

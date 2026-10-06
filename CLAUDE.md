@@ -27,7 +27,8 @@ The rules in [CONTRIBUTING.md](CONTRIBUTING.md#invariants) are the product, not 
 preferences. In short: everything is batched, the budget cannot be removed, truncation is
 always reported, a per-path failure never fails the call, nothing walks `.git`, line
 numbers are on by default, every tool is read-only, stdout belongs to the protocol, and
-the rendered text is sent once — never again inside the structured copy.
+the rendered text ships in both halves of the response — the structured copy included,
+because some hosts show only that one.
 
 A rendering change is not finished until a test asserts the exact text it produces. The
 output format *is* the product; `one_call_reads_a_whole_batch_in_order` is the shape those

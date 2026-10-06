@@ -300,9 +300,12 @@ fn a_survey_sizes_up_a_tree_before_anything_is_read() {
 }
 
 #[test]
-fn no_response_pays_for_the_same_text_twice() {
-    // The rendered text is the response's text content. A structured copy of the same
-    // bytes would double the cost of every call this server exists to make cheap.
+fn every_response_carries_its_text_in_both_halves() {
+    // Clients disagree about which half of a response they display: Claude Code shows
+    // `structuredContent` and drops the text content, other hosts do the reverse. So the
+    // rendered text ships in both, and the duplication is deliberate. It was once removed
+    // to save bytes on the wire — the result was a server whose every tool answered with
+    // metadata and no content. The wire bytes are nobody's context; the text is.
     let tree = Tree::new();
     tree.write("src/lib.rs", "pub fn run() {}\n")
         .write("Cargo.toml", "[package]\nname = \"thing\"\n");
@@ -327,13 +330,16 @@ fn no_response_pays_for_the_same_text_twice() {
         assert!(!result.is_error(), "{tool}: {}", result.text());
         assert!(!result.text().is_empty(), "{tool} rendered nothing");
         let structured = result.structured();
-        assert!(
-            structured.get("text").is_none(),
-            "{tool} sent its rendered text a second time: {structured}"
-        );
-        assert!(
-            !structured.to_string().contains(result.text().trim_end()),
-            "{tool} sent its rendered text a second time: {structured}"
+        let carried = structured
+            .get("text")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or_else(|| {
+                panic!("{tool} left its text out of the structured copy: {structured}")
+            });
+        assert_eq!(
+            carried,
+            result.text(),
+            "{tool}: the two halves of the response disagree"
         );
     }
 }
