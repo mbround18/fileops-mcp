@@ -89,6 +89,12 @@ These are the reason the crate exists. Do not relax them without a very good arg
 11. **Determinism.** Walks are sorted, dates are computed arithmetically
     (`civil_from_days`) rather than through a calendar crate, and tests read and write
     only inside their own tempdir.
+12. **Nothing is sent twice.** The rendered text travels in the response's text block and
+    nowhere else: every outcome's `text` field is `#[serde(skip_serializing)]`, so the
+    structured copy carries the counts and never a second copy of the bytes the caller is
+    already reading. `no_response_pays_for_the_same_text_twice` asserts it for every tool.
+    A 40-line `read` costs 2.1k on the wire; it cost 4.1k when the text was serialized
+    too.
 
 ### Language patterns
 

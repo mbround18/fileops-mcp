@@ -94,6 +94,9 @@ pub struct FileMatches {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct GrepOutcome {
+    /// Not serialized: the adapter sends it as the response's text, and a structured
+    /// copy of the same bytes would double the cost of every call.
+    #[serde(skip_serializing)]
     pub text: String,
     pub files: Vec<FileMatches>,
     pub matches: usize,

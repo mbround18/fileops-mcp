@@ -298,3 +298,42 @@ fn a_survey_sizes_up_a_tree_before_anything_is_read() {
          [3 files in 2 dirs, 16B, 5L]\n"
     );
 }
+
+#[test]
+fn no_response_pays_for_the_same_text_twice() {
+    // The rendered text is the response's text content. A structured copy of the same
+    // bytes would double the cost of every call this server exists to make cheap.
+    let tree = Tree::new();
+    tree.write("src/lib.rs", "pub fn run() {}\n")
+        .write("Cargo.toml", "[package]\nname = \"thing\"\n");
+    let mut server = tree.server();
+
+    for (tool, arguments) in [
+        (
+            "read",
+            serde_json::json!({"specs": [{"path": "src/lib.rs"}]}),
+        ),
+        ("grep", serde_json::json!({"patterns": ["fn"]})),
+        ("find", serde_json::json!({"roots": ["."]})),
+        ("inspect", serde_json::json!({"paths": ["src/lib.rs"]})),
+        ("outline", serde_json::json!({"paths": ["src/lib.rs"]})),
+        (
+            "extract",
+            serde_json::json!({"specs": [{"path": "Cargo.toml"}]}),
+        ),
+        ("survey", serde_json::json!({})),
+    ] {
+        let result = server.call(tool, arguments);
+        assert!(!result.is_error(), "{tool}: {}", result.text());
+        assert!(!result.text().is_empty(), "{tool} rendered nothing");
+        let structured = result.structured();
+        assert!(
+            structured.get("text").is_none(),
+            "{tool} sent its rendered text a second time: {structured}"
+        );
+        assert!(
+            !structured.to_string().contains(result.text().trim_end()),
+            "{tool} sent its rendered text a second time: {structured}"
+        );
+    }
+}

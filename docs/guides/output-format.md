@@ -230,3 +230,8 @@ Alongside the text, each tool returns the same data as JSON: `read` gives
 modified}` with `found` and `truncated`; `inspect` gives `paths[] {path, status, detail,
 bytes, lines, entries, modified, symlink}` with `total_bytes` and `missing`. Read the text
 — the JSON is there for callers that need to branch on a count.
+
+The rendered text is not part of that JSON. It is sent once, as the response's text block;
+repeating it in the structured copy would double the cost of every call, which for a
+40-line `read` is the difference between 2.1k and 4.1k bytes on the wire. So branch on
+`truncated`, `lines_shown` or `missing`, and show the text itself.

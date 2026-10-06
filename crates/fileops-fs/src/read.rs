@@ -114,6 +114,10 @@ pub struct FileRead {
 #[derive(Debug, Clone, Serialize)]
 pub struct ReadOutcome {
     /// The rendered text. This is what a caller should show; the rest is for machines.
+    ///
+    /// Not serialized: the adapter sends it as the response's text, and a structured
+    /// copy of the same bytes would double the cost of every call.
+    #[serde(skip_serializing)]
     pub text: String,
     pub files: Vec<FileRead>,
     pub lines_shown: usize,
