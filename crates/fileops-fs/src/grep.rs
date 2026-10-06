@@ -113,8 +113,17 @@ pub fn grep(request: &GrepRequest) -> Result<GrepOutcome> {
     let include = walk::globs(&request.glob)?;
     let exclude = walk::globs(&request.exclude)?;
     let cwd = request.cwd.as_deref();
-    let max_per_file = request.max_per_file.unwrap_or(DEFAULT_MAX_PER_FILE);
-    let max_matches = request.max_matches.unwrap_or(DEFAULT_MAX_MATCHES);
+    // `counts` and `files` render one line per file however many hits it holds, so the
+    // match caps would cut the listing short and under-report the totals. Only the byte
+    // budget bounds them.
+    let (max_per_file, max_matches) = if matches!(request.mode, Mode::Lines) {
+        (
+            request.max_per_file.unwrap_or(DEFAULT_MAX_PER_FILE),
+            request.max_matches.unwrap_or(DEFAULT_MAX_MATCHES),
+        )
+    } else {
+        (usize::MAX, usize::MAX)
+    };
 
     let mut budget = Budget::new(request.max_bytes);
     let mut out = String::new();
@@ -458,6 +467,27 @@ src/a.rs (2)
         assert_eq!(rendered_matches(&outcome.files), 3);
         assert!(
             outcome.text.contains("stopped at a cap"),
+            "{}",
+            outcome.text
+        );
+    }
+
+    #[test]
+    fn the_match_caps_do_not_shorten_a_counts_listing() {
+        let fixture = Fixture::new();
+        for name in ["a.txt", "b.txt", "c.txt"] {
+            fixture.write(name, "hit\nhit\n");
+        }
+        let outcome = fixture.run(GrepRequest {
+            patterns: patterns(&["hit"]),
+            mode: Mode::Counts,
+            max_matches: Some(3),
+            ..Default::default()
+        });
+        assert_eq!(outcome.files.len(), 3, "every file is still counted");
+        assert_eq!(outcome.matches, 6);
+        assert!(
+            !outcome.text.contains("stopped at a cap"),
             "{}",
             outcome.text
         );

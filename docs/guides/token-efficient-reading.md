@@ -90,7 +90,8 @@ Lower it on purpose when you are sampling — `max_bytes: 2000` across ten specs
 reliable way to see a little of everything. Raise it only when you know the answer is
 large and you need all of it. Caps that are not the budget behave the same way: `grep`
 shows 20 matches per file and 200 per call, `find` 500 entries, and each one says when it
-bit.
+bit. `mode: counts` and `mode: files` are one line per file, so those two caps do not
+apply to them — the tally is always the whole tally.
 
 ## 6. Keep the line numbers
 

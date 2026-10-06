@@ -108,10 +108,10 @@ pub struct GrepParams {
     /// Lines of context either side of each match.
     #[serde(default)]
     pub context: usize,
-    /// Matches rendered per file before truncating (default 20).
+    /// Matches rendered per file before truncating (default 20, `lines` mode only).
     #[serde(default)]
     pub max_per_file: Option<usize>,
-    /// Matches rendered in total (default 200).
+    /// Matches rendered in total (default 200, `lines` mode only).
     #[serde(default)]
     pub max_matches: Option<usize>,
     /// `lines` (default) renders matching lines; `counts` one line per file with its match

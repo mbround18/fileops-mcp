@@ -91,7 +91,8 @@ src/lib.rs (2)
   that never reached the right directory.
 
 `mode: counts` keeps the tally and drops the lines; `mode: files` keeps only the paths —
-the cheap first call when the next step is a `read`:
+the cheap first call when the next step is a `read`. Both render one line per file, so the
+match caps do not apply to them and the counts are complete:
 
 ```
 docs/guide.md 1          docs/guide.md
