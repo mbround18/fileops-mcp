@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__fileops__read",
+      "mcp__fileops__grep",
+      "mcp__fileops__find",
+      "mcp__fileops__inspect",
+      "Bash(make:*)",
+      "Bash(cargo test:*)",
+      "Bash(cargo clippy:*)",
+      "Bash(cargo fmt:*)",
+      "Bash(cargo build:*)"
+    ]
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "fileops": {
+      "command": "fileops-mcp",
+      "args": [],
+      "env": {}
+    }
+  }
+}

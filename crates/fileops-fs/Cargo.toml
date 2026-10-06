@@ -1,0 +1,20 @@
+[package]
+name = "fileops-fs"
+description = "Token-efficient filesystem reading: batched line slices, search and listings rendered as compact text."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+globset = { workspace = true }
+ignore = { workspace = true }
+regex = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3"

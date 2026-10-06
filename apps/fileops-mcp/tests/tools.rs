@@ -1,0 +1,184 @@
+//! End-to-end: the four tools as an MCP client sees them.
+
+mod sandbox;
+
+use sandbox::Tree;
+
+#[test]
+fn the_four_tools_are_advertised_with_their_batch_parameters() {
+    let tree = Tree::new();
+    let mut server = tree.server();
+    let tools = server.tools();
+    let names: Vec<&str> = tools["tools"]
+        .as_array()
+        .expect("tools")
+        .iter()
+        .map(|tool| tool["name"].as_str().unwrap())
+        .collect();
+    let mut sorted = names.clone();
+    sorted.sort();
+    assert_eq!(sorted, vec!["find", "grep", "inspect", "read"]);
+
+    let read = tools["tools"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|tool| tool["name"] == "read")
+        .unwrap();
+    let schema = read["inputSchema"].to_string();
+    for parameter in ["specs", "lines", "head", "tail", "max_lines", "max_bytes"] {
+        assert!(
+            schema.contains(parameter),
+            "`{parameter}` missing from {schema}"
+        );
+    }
+    assert!(
+        server.instructions.contains("Prefer these tools over"),
+        "the server tells the client what it is for: {}",
+        server.instructions
+    );
+}
+
+#[test]
+fn one_read_call_replaces_a_chain_of_shell_reads() {
+    let tree = Tree::new();
+    tree.write(".specify/extensions.yml", "extensions: []\n")
+        .write(".specify/feature.json", "{\"id\": \"010\"}\n")
+        .numbered("specs/010-x/spec.md", 300)
+        .write(
+            "specs/010-x/tasks.md",
+            "- [x] done\n- [ ] open one\nnoise\n- [ ] open two\n",
+        );
+
+    let mut server = tree.server();
+    let result = server.call(
+        "read",
+        serde_json::json!({
+            "specs": [
+                {"path": ".specify/extensions.yml"},
+                {"path": ".specify/feature.json"},
+                {"path": "specs/010-x/spec.md", "lines": "1-2"},
+                {"path": "specs/010-x/tasks.md", "grep": "^- \\[ \\]"}
+            ]
+        }),
+    );
+
+    assert!(!result.is_error(), "{}", result.text());
+    assert_eq!(
+        result.text(),
+        "\
+#1 .specify/extensions.yml 1/1
+1: extensions: []
+#2 .specify/feature.json 1/1
+1: {\"id\": \"010\"}
+#3 specs/010-x/spec.md 1-2/300
+1: line 1
+2: line 2
+#4 specs/010-x/tasks.md 2,4/4
+2: - [ ] open one
+4: - [ ] open two
+[4 files, 6 lines, 212 chars]
+"
+    );
+    assert_eq!(result.structured()["files"].as_array().unwrap().len(), 4);
+    assert_eq!(result.structured()["lines_shown"], 6);
+}
+
+#[test]
+fn a_bad_request_comes_back_as_a_readable_tool_error() {
+    let tree = Tree::new();
+    tree.numbered("a.txt", 5);
+    let mut server = tree.server();
+
+    let result = server.call("read", serde_json::json!({"specs": []}));
+    assert!(result.is_error());
+    assert!(
+        result.text().contains("at least one spec"),
+        "{}",
+        result.text()
+    );
+
+    let result = server.call(
+        "read",
+        serde_json::json!({"specs": [{"path": "a.txt", "lines": "40-12"}]}),
+    );
+    assert!(result.is_error());
+    assert!(
+        result.text().contains("not a line range"),
+        "{}",
+        result.text()
+    );
+}
+
+#[test]
+fn grep_locates_before_reading() {
+    let tree = Tree::new();
+    tree.write("src/a.rs", "fn one() {}\nlet x = 1;\n")
+        .write("src/b.rs", "fn two() {}\n")
+        .write("target/generated.rs", "fn three() {}\n")
+        .write(".gitignore", "target\n");
+
+    let mut server = tree.server();
+    let files = server.call(
+        "grep",
+        serde_json::json!({"patterns": ["^fn "], "mode": "files"}),
+    );
+    assert_eq!(
+        files.text(),
+        "src/a.rs\nsrc/b.rs\n[2 matches in 2 files, 2 searched]\n"
+    );
+
+    let lines = server.call(
+        "grep",
+        serde_json::json!({"patterns": ["^fn "], "glob": ["a.rs"]}),
+    );
+    assert_eq!(
+        lines.text(),
+        "src/a.rs (1)\n1: fn one() {}\n[1 match in 1 file, 1 searched]\n"
+    );
+    assert_eq!(lines.structured()["matches"], 1);
+}
+
+#[test]
+fn find_and_inspect_answer_what_is_here_and_how_big_it_is() {
+    let tree = Tree::new();
+    tree.write("src/lib.rs", "a\n")
+        .write("src/main.rs", "b\n")
+        .numbered("docs/guide.md", 40);
+
+    let mut server = tree.server();
+    let listing = server.call("find", serde_json::json!({"depth": 2, "kind": "file"}));
+    assert_eq!(
+        listing.text(),
+        "docs/\n  guide.md\nsrc/\n  lib.rs main.rs\n[3 of 3 entries (0 dirs)]\n"
+    );
+
+    let described = server.call(
+        "inspect",
+        serde_json::json!({"paths": ["docs/*.md", "nope"]}),
+    );
+    let text = described.text();
+    assert!(text.contains("docs/guide.md 311B 40L"), "{text}");
+    assert!(text.contains("nope (missing)"), "{text}");
+    assert_eq!(described.structured()["missing"], 1);
+}
+
+#[test]
+fn every_response_is_bounded_and_says_what_it_left_out() {
+    let tree = Tree::new();
+    tree.numbered("huge.txt", 5000);
+    let mut server = tree.server();
+
+    let result = server.call(
+        "read",
+        serde_json::json!({"specs": [{"path": "huge.txt"}], "max_bytes": 200}),
+    );
+    let text = result.text();
+    assert!(
+        text.len() < 400,
+        "a budget of 200 held: {} bytes",
+        text.len()
+    );
+    assert!(text.contains("lines cut"), "{text}");
+    assert_eq!(result.structured()["truncated"], 1);
+}
