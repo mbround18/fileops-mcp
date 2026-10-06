@@ -127,6 +127,29 @@ src/big.txt 792B 2026-10-06
 [5 of 5 entries (0 dirs)]
 ```
 
+## `outline`
+
+Like `grep`'s default mode, but the lines are declarations rather than matches:
+
+```
+docs/guide.md (3)
+1: # Guide
+5: ## Install
+9: ## Usage
+src/lib.rs (2)
+1: pub struct Spec
+5: pub fn run()
+[5 symbols in 2 files, 2 read]
+```
+
+* The count after the path is what was found; `(3 of 40)` means a cap cut the rest.
+* Each declaration is the source line with its trailing `{`, `{}`, `,`, `:` or `;` removed,
+  elided with `…` past 110 columns, and its indentation kept — nesting is information.
+* `read` counts the files opened. A file whose type has no pattern is counted in
+  `without a pattern`, and is named only when it was asked for directly:
+  `notes.rtf (no outline for this type)`.
+* The footer's caps read `stopped at a cap: raise limit/max_bytes or narrow the paths`.
+
 ## `inspect`
 
 One line per path, with only the facts that apply:

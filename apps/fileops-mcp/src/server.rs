@@ -6,7 +6,7 @@
 
 use std::path::PathBuf;
 
-use fileops_fs::{FindRequest, GrepRequest, InspectRequest, ReadRequest, ReadSpec};
+use fileops_fs::{FindRequest, GrepRequest, InspectRequest, OutlineRequest, ReadRequest, ReadSpec};
 use rmcp::{
     ErrorData, ServerHandler,
     handler::server::wrapper::Parameters,
@@ -28,6 +28,9 @@ shell `cat`, `head`, `tail`, `sed -n`, `grep`, `ls`, `find`, `tree` and `wc -l`.
 narrow or widen it.
 - `inspect` — size, line count and kind for a batch of paths. The cheap call that tells you \
 which expensive read is worth making.
+- `outline` — the declarations in a file (headings, `fn`/`class`/`type`, Make targets, \
+config sections) with their line numbers, so the next `read` can name the exact span \
+instead of the first hundred lines.
 
 Two habits make the difference:
 
@@ -95,6 +98,45 @@ pub struct SpecParams {
     /// Hard cap on lines from this file.
     #[serde(default)]
     pub max_lines: Option<usize>,
+}
+
+#[derive(Debug, Default, Deserialize, schemars::JsonSchema)]
+pub struct OutlineParams {
+    /// Files, directories or globs to outline. Defaults to `.`.
+    #[serde(default)]
+    pub paths: Vec<String>,
+    /// Only outline paths matching these globs (`**/*.rs`).
+    #[serde(default)]
+    pub glob: Vec<String>,
+    /// Skip paths matching these globs.
+    #[serde(default)]
+    pub exclude: Vec<String>,
+    /// Use this regex instead of the built-in language patterns, for a file type that has
+    /// none or a convention of your own (`^TASK `).
+    #[serde(default)]
+    pub pattern: Option<String>,
+    /// Markdown heading depth: `2` keeps `#` and `##` and drops the rest.
+    #[serde(default)]
+    pub levels: Option<usize>,
+    /// Declarations rendered per file (default 60).
+    #[serde(default)]
+    pub max_per_file: Option<usize>,
+    /// Declarations rendered in total (default 400).
+    #[serde(default)]
+    pub limit: Option<usize>,
+    /// Directory levels to walk. `1` is the named directory itself.
+    #[serde(default)]
+    pub depth: Option<usize>,
+    /// Include hidden files. `.git` is never walked either way.
+    #[serde(default)]
+    pub hidden: bool,
+    /// Ignore `.gitignore` and friends.
+    #[serde(default)]
+    pub no_ignore: bool,
+    #[serde(default)]
+    pub cwd: Option<String>,
+    #[serde(default)]
+    pub max_bytes: Option<usize>,
 }
 
 #[derive(Debug, Default, Deserialize, schemars::JsonSchema)]
@@ -348,6 +390,35 @@ impl FileOpsServer {
         };
 
         match fileops_fs::find(&request) {
+            Ok(outcome) => Ok(with_structured(outcome.text.clone(), &outcome)),
+            Err(err) => Ok(failed(err)),
+        }
+    }
+
+    #[tool(
+        name = "outline",
+        description = "The shape of a batch of files without their contents: one line per declaration, with its line number. Markdown headings, Rust `fn`/`struct`/`impl`, Python `def`/`class`, JS/TS `function`/`class`/`interface`, Go, Ruby, JVM-family and C-family declarations, shell functions, Make targets, TOML sections, top-level YAML/JSON keys. Use it instead of reading the first hundred lines of an unfamiliar file: the line numbers it returns are what a following `read` should name. `pattern` overrides the built-in regexes, `levels` limits heading depth."
+    )]
+    fn outline(
+        &self,
+        Parameters(params): Parameters<OutlineParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let request = OutlineRequest {
+            paths: params.paths,
+            glob: params.glob,
+            exclude: params.exclude,
+            pattern: params.pattern,
+            levels: params.levels,
+            max_per_file: params.max_per_file,
+            limit: params.limit,
+            depth: params.depth,
+            hidden: params.hidden,
+            no_ignore: params.no_ignore,
+            cwd: params.cwd.map(PathBuf::from),
+            max_bytes: self.budget(params.max_bytes),
+        };
+
+        match fileops_fs::outline(&request) {
             Ok(outcome) => Ok(with_structured(outcome.text.clone(), &outcome)),
             Err(err) => Ok(failed(err)),
         }

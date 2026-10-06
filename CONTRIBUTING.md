@@ -41,7 +41,7 @@ Ports and adapters, with the filesystem as the only dependency:
   `src/deep/`), and the `ignore::WalkBuilder` setup: `require_git(false)` so `.gitignore`
   is honoured outside a repository, `sort_by_file_name` for determinism, and `.git` never
   entered.
-* `read.rs`, `grep.rs`, `find.rs`, `inspect.rs` — one module per tool. Each takes a
+* `read.rs`, `grep.rs`, `find.rs`, `inspect.rs`, `outline.rs` — one module per tool. Each takes a
   request holding a *list*, spends from one `Budget`, and returns both the rendered text
   and the structured outcome behind it.
 
@@ -85,6 +85,13 @@ These are the reason the crate exists. Do not relax them without a very good arg
 11. **Determinism.** Walks are sorted, dates are computed arithmetically
     (`civil_from_days`) rather than through a calendar crate, and tests read and write
     only inside their own tempdir.
+
+### Language patterns
+
+`outline.rs` holds one regex per language family and no parser. They are tuned to miss
+rather than to guess: a line that obviously declares something is kept, anything clever is
+left to `grep` or to the caller's own `pattern`. A new family is a match arm, a `name`, and
+a test asserting the exact outline of a small real-looking file — not a new dependency.
 
 ## Testing
 

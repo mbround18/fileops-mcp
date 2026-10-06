@@ -1,11 +1,11 @@
-//! End-to-end: the four tools as an MCP client sees them.
+//! End-to-end: the tools as an MCP client sees them.
 
 mod sandbox;
 
 use sandbox::Tree;
 
 #[test]
-fn the_four_tools_are_advertised_with_their_batch_parameters() {
+fn every_tool_is_advertised_with_its_batch_parameters() {
     let tree = Tree::new();
     let mut server = tree.server();
     let tools = server.tools();
@@ -17,7 +17,7 @@ fn the_four_tools_are_advertised_with_their_batch_parameters() {
         .collect();
     let mut sorted = names.clone();
     sorted.sort();
-    assert_eq!(sorted, vec!["find", "grep", "inspect", "read"]);
+    assert_eq!(sorted, vec!["find", "grep", "inspect", "outline", "read"]);
 
     let read = tools["tools"]
         .as_array()
@@ -26,7 +26,16 @@ fn the_four_tools_are_advertised_with_their_batch_parameters() {
         .find(|tool| tool["name"] == "read")
         .unwrap();
     let schema = read["inputSchema"].to_string();
-    for parameter in ["specs", "lines", "head", "tail", "max_lines", "max_bytes"] {
+    for parameter in [
+        "specs",
+        "lines",
+        "head",
+        "tail",
+        "from",
+        "to",
+        "max_lines",
+        "max_bytes",
+    ] {
         assert!(
             schema.contains(parameter),
             "`{parameter}` missing from {schema}"
@@ -181,4 +190,53 @@ fn every_response_is_bounded_and_says_what_it_left_out() {
     );
     assert!(text.contains("lines cut"), "{text}");
     assert_eq!(result.structured()["truncated"], 1);
+}
+
+#[test]
+fn an_outline_locates_what_a_following_read_should_name() {
+    let tree = Tree::new();
+    tree.write(
+        "docs/guide.md",
+        "# Guide\n\nprose\n\n## Install\n\nmore prose\n\n## Usage\n\nstill more\n",
+    )
+    .write(
+        "src/lib.rs",
+        "pub struct Spec {\n    pub path: String,\n}\n\npub fn run() {}\n",
+    );
+    let mut server = tree.server();
+
+    let outline = server.call(
+        "outline",
+        serde_json::json!({"paths": ["docs/guide.md", "src/lib.rs"]}),
+    );
+    assert!(!outline.is_error(), "{}", outline.text());
+    assert_eq!(
+        outline.text(),
+        "docs/guide.md (3)\n\
+         1: # Guide\n\
+         5: ## Install\n\
+         9: ## Usage\n\
+         src/lib.rs (2)\n\
+         1: pub struct Spec\n\
+         5: pub fn run()\n\
+         [5 symbols in 2 files, 2 read]\n"
+    );
+
+    // The outline said where "## Install" starts; the read names that section without
+    // anyone counting lines.
+    let read = server.call(
+        "read",
+        serde_json::json!({"specs": [{"path": "docs/guide.md", "from": "^## Install", "to": "^## "}]}),
+    );
+    assert!(!read.is_error(), "{}", read.text());
+    assert_eq!(
+        read.text(),
+        "#1 docs/guide.md 5-9/11\n\
+         5: ## Install\n\
+         6: \n\
+         7: more prose\n\
+         8: \n\
+         9: ## Usage\n\
+         [1 file, 5 lines, 72 chars]\n"
+    );
 }

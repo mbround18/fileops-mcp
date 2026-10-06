@@ -67,7 +67,31 @@ for it:
 `inspect` is the call that stops the expensive one: `792B 100L` means read it, `1.6M
 binary` means do not.
 
-## 4. Narrow the walk, not the output
+## 4. Ask for the shape before the contents
+
+`outline` is the "what is in this file" call. It keeps the line that declares each thing
+and throws the rest away, so an unfamiliar 2 000-line file costs forty lines instead of a
+hundred that happen to be at the top:
+
+```json
+{"paths": ["crates/fileops-fs/src"], "glob": ["**/*.rs"]}
+```
+```
+crates/fileops-fs/src/read.rs (14)
+27: pub struct ReadSpec
+52: pub struct ReadRequest
+116: pub fn read(request: &ReadRequest) -> Result<ReadOutcome>
+[…]
+```
+
+The line numbers are the point: the next call is a `read` with `lines: "116-180"`, not a
+second guess. On a document, `outline` with `levels: 2` is a table of contents, and the
+heading it returns is exactly the `from` pattern a `read` needs.
+
+`pattern` makes it work on anything with a convention of its own — `^TASK `, `^- \[ \]`,
+`^### T0` — for file types with no built-in pattern.
+
+## 5. Narrow the walk, not the output
 
 `grep` and `find` honour `.gitignore` and skip hidden files by default, and never enter
 `.git`. That — not the formatting — is most of why they are cheaper than `grep -r`. Narrow
@@ -81,7 +105,7 @@ further with the walk, before anything is read:
 A path you name outright is always read, whatever the filters say — so a `glob` never
 hides the one file you asked for.
 
-## 5. Let the budget do the worrying
+## 6. Let the budget do the worrying
 
 Every response has a byte ceiling: 40 000 by default, up to 400 000 with `max_bytes`. It
 cannot be switched off, so the worst case of a careless call is a truncation marker rather
@@ -100,14 +124,14 @@ shows 20 matches per file and 200 per call, `find` 500 entries, and each one say
 bit. `mode: counts` and `mode: files` are one line per file, so those two caps do not
 apply to them — the tally is always the whole tally.
 
-## 6. Keep the line numbers
+## 7. Keep the line numbers
 
 `number: true` is the default because a slice without line numbers cannot be edited
 against — you would have to read the file again to find out where you were. Turn it off
 only when the text itself is the deliverable (a file being copied verbatim), and
 `raw: true` only when trailing whitespace matters.
 
-## 7. What a batch should look like
+## 8. What a batch should look like
 
 Orienting in an unfamiliar repository, in three calls:
 
@@ -118,6 +142,9 @@ Orienting in an unfamiliar repository, in three calls:
 {"patterns": ["fn main", "#\\[tokio::main\\]"], "paths": ["."], "glob": ["**/*.rs"], "mode": "files"}
 ```
 ```json
+{"paths": ["README.md", "apps"], "levels": 2, "glob": ["**/*.rs", "**/*.md"]}
+```
+```json
 {"specs": [
   {"path": "README.md", "head": 60},
   {"path": "Cargo.toml"},
@@ -126,5 +153,5 @@ Orienting in an unfamiliar repository, in three calls:
 ]}
 ```
 
-Shape, then location, then content — and never a whole file where a heading list would
-have done.
+Shape, then location, then outline, then content — and never a whole file where a heading
+list would have done.

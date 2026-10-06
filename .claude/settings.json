@@ -5,6 +5,7 @@
       "mcp__fileops__grep",
       "mcp__fileops__find",
       "mcp__fileops__inspect",
+      "mcp__fileops__outline",
       "Bash(make:*)",
       "Bash(cargo test:*)",
       "Bash(cargo clippy:*)",

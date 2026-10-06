@@ -6,12 +6,13 @@
 //! once in a round trip per chain, and once in the output, which arrives framed for a
 //! human terminal rather than for a context window.
 //!
-//! The four entry points take **batches** and render **compact text**:
+//! The entry points take **batches** and render **compact text**:
 //!
 //! * [`read::read`] — line slices of many files at once (`cat`/`head`/`tail`/`sed -n`).
 //! * [`grep::grep`] — search, grouped by file, with caps per file and overall.
 //! * [`find::find`] — listings (`ls`/`find`/`tree`), grouped by directory.
 //! * [`inspect::inspect`] — size, line count and kind, to decide what is worth reading.
+//! * [`outline::outline`] — the declarations in a file, so the next read can be exact.
 //!
 //! Three rules hold across all of them:
 //!
@@ -25,6 +26,7 @@ pub mod budget;
 pub mod find;
 pub mod grep;
 pub mod inspect;
+pub mod outline;
 pub mod read;
 pub mod slice;
 pub mod text;
@@ -34,6 +36,7 @@ pub use budget::{Budget, DEFAULT_MAX_BYTES};
 pub use find::{FindOutcome, FindRequest, find};
 pub use grep::{GrepOutcome, GrepRequest, grep};
 pub use inspect::{InspectOutcome, InspectRequest, inspect};
+pub use outline::{FileOutline, OutlineOutcome, OutlineRequest, outline};
 pub use read::{FileRead, ReadOutcome, ReadRequest, ReadSpec, read};
 
 /// Errors that make a whole request invalid.
