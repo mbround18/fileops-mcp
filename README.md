@@ -70,11 +70,11 @@ The rules behind them:
 
 * **Nothing takes a single path where a list would do.** One call, one byte budget, one
   footer — eight specs cost one round trip.
-* **A byte budget is always in force.** Default 40 000 bytes, `max_bytes` raises it to at
+* **A byte budget is always in force.** Default 20 000 bytes, `max_bytes` raises it to at
   most 400 000. It cannot be removed, and output never trails off silently: a response that
   ends in `truncated` says what was cut and by which cap.
-* **Nothing is unbounded by default.** `grep` renders at most 20 matches per file and 200
-  per call, `find` at most 500 entries, and each cap reports when it bites.
+* **Nothing is unbounded by default.** `grep` renders at most 12 matches per file and 120
+  per call, `find` at most 200 entries, and each cap reports when it bites.
 * **A path that cannot be read costs one line, not the batch.** `(missing)`,
   `(binary, 24K)`, `(directory)`, `(unreadable: permission denied)` — a bad entry in a
   batch of ten never discards the other nine.

@@ -62,7 +62,7 @@ pub struct ReadParams {
     /// Directory relative paths resolve against. Defaults to the server's own.
     #[serde(default)]
     pub cwd: Option<String>,
-    /// Ceiling on rendered output in bytes (default 40000, max 400000). Output is
+    /// Ceiling on rendered output in bytes (default 20000, max 400000). Output is
     /// truncated with a marker rather than silently cut.
     #[serde(default)]
     pub max_bytes: Option<usize>,
@@ -127,10 +127,10 @@ pub struct OutlineParams {
     /// Markdown heading depth: `2` keeps `#` and `##` and drops the rest.
     #[serde(default)]
     pub levels: Option<usize>,
-    /// Declarations rendered per file (default 60).
+    /// Declarations rendered per file (default 30).
     #[serde(default)]
     pub max_per_file: Option<usize>,
-    /// Declarations rendered in total (default 400).
+    /// Declarations rendered in total (default 180).
     #[serde(default)]
     pub limit: Option<usize>,
     /// Directory levels to walk. `1` is the named directory itself.
@@ -169,10 +169,10 @@ pub struct GrepParams {
     /// Lines of context either side of each match.
     #[serde(default)]
     pub context: usize,
-    /// Matches rendered per file before truncating (default 20, `lines` mode only).
+    /// Matches rendered per file before truncating (default 12, `lines` mode only).
     #[serde(default)]
     pub max_per_file: Option<usize>,
-    /// Matches rendered in total (default 200, `lines` mode only).
+    /// Matches rendered in total (default 120, `lines` mode only).
     #[serde(default)]
     pub max_matches: Option<usize>,
     /// `lines` (default) renders matching lines; `counts` one line per file with its match
@@ -228,7 +228,7 @@ pub struct FindParams {
     /// Follow symlinks.
     #[serde(default)]
     pub follow: bool,
-    /// Entries rendered (default 500).
+    /// Entries rendered (default 200).
     #[serde(default)]
     pub limit: Option<usize>,
     /// One full path per line instead of grouping by directory.
@@ -304,7 +304,7 @@ pub struct ExtractSpecParams {
     /// it, so a large object costs a line per key.
     #[serde(default)]
     pub depth: Option<usize>,
-    /// Values rendered from this document (default 200).
+    /// Values rendered from this document (default 80).
     #[serde(default)]
     pub max_leaves: Option<usize>,
 }
@@ -330,10 +330,10 @@ pub struct SurveyParams {
     #[serde(default)]
     pub no_ignore: bool,
     /// File types listed separately before the tail folds into one `other` line
-    /// (default 12).
+    /// (default 8).
     #[serde(default)]
     pub kinds: Option<usize>,
-    /// Largest files listed (default 10, `0` drops the table).
+    /// Largest files listed (default 6, `0` drops the table).
     #[serde(default)]
     pub top: Option<usize>,
     /// Count lines, which opens every file. Defaults to true; turn it off on a very large

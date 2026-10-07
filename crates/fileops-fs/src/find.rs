@@ -17,7 +17,7 @@ use crate::{
 };
 
 /// Default ceiling on entries rendered.
-pub const DEFAULT_LIMIT: usize = 500;
+pub const DEFAULT_LIMIT: usize = 200;
 /// Target width for a packed line of entry names.
 const WIDTH: usize = 96;
 

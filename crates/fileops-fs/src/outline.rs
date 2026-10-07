@@ -23,10 +23,10 @@ use crate::{
 };
 
 /// Symbols rendered per file before the rest are counted but not shown.
-pub const DEFAULT_MAX_PER_FILE: usize = 60;
+pub const DEFAULT_MAX_PER_FILE: usize = 30;
 
 /// Symbols rendered across the whole call.
-pub const DEFAULT_LIMIT: usize = 400;
+pub const DEFAULT_LIMIT: usize = 180;
 
 /// Longest declaration line rendered before it is elided — a signature spanning 200
 /// columns says nothing the first 110 do not.

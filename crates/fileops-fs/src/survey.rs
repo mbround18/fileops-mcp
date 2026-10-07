@@ -18,10 +18,10 @@ use crate::{
 };
 
 /// File types listed before the rest are summed into one `other` line.
-pub const DEFAULT_KINDS: usize = 12;
+pub const DEFAULT_KINDS: usize = 8;
 
 /// Largest files listed.
-pub const DEFAULT_TOP: usize = 10;
+pub const DEFAULT_TOP: usize = 6;
 
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(deny_unknown_fields)]

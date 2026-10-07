@@ -19,7 +19,7 @@ use crate::{
 };
 
 /// Leaf lines rendered per spec before the rest are counted but not shown.
-pub const DEFAULT_MAX_LEAVES: usize = 200;
+pub const DEFAULT_MAX_LEAVES: usize = 80;
 
 /// Longest value rendered before it is elided.
 const WIDTH: usize = 200;

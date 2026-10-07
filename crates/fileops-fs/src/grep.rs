@@ -32,9 +32,9 @@ pub enum Mode {
 }
 
 /// Default ceiling on matches rendered per file.
-pub const DEFAULT_MAX_PER_FILE: usize = 20;
+pub const DEFAULT_MAX_PER_FILE: usize = 12;
 /// Default ceiling on matches rendered per call.
-pub const DEFAULT_MAX_MATCHES: usize = 200;
+pub const DEFAULT_MAX_MATCHES: usize = 120;
 
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(deny_unknown_fields)]

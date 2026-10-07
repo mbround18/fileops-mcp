@@ -9,7 +9,7 @@
 ///
 /// Roughly 10k tokens of code: large enough for a dozen file slices, small enough that an
 /// accident cannot eat a context window.
-pub const DEFAULT_MAX_BYTES: usize = 40_000;
+pub const DEFAULT_MAX_BYTES: usize = 20_000;
 
 /// Hard ceiling on what a request may ask for, however large its `max_bytes`.
 pub const MAX_MAX_BYTES: usize = 400_000;
